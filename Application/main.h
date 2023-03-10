@@ -73,7 +73,7 @@ void key_light_control_debug_task(void *pdata);
 /*填充要发送的数据*/
 extern void fill_tx_data(uint8_t txv2, uint8_t txv3, uint8_t txv4, uint8_t txv5);
 
-
+uint8_t CheckSum(const uint8_t *buf, uint8_t len);
 
 
 #endif

@@ -33,9 +33,11 @@ IIC_CircleBuffer g_i2c0_txbuf;/*I2C发送缓冲区*/
 
 CH453_AT9236_map_t g_CH453_AT9236_map[33];/*CH453寄存器映射*/
 
-uint8_t g_GPIO_KEY_map_value[48];/*按键映射*/
+uint8_t g_GPIO_KEY_map_value[48];/*按键映射*/   //好像是需要16的整数倍，之前定义40都是不行，数据会被冲掉
 uint8_t g_GPIO_LED_map_value[48];/*LED灯映射*/
 
+uint8_t g_save_presskey1 = 0;
+uint8_t g_save_releasekey1 = 0;
 
 
 //uint8_t g_pwm_value = 0;/*PWM亮度,0-250*/
@@ -48,10 +50,6 @@ int G_CH453_INT_FLAG;
 #endif
 
 
-uint8_t CheckSum(const uint8_t *buf, uint8_t len);
-
-uint8_t g_save_presskey1 = 0;
-uint8_t g_save_releasekey1 = 0;
 
 
 /*按键值对应寄存器*/
@@ -461,7 +459,7 @@ uint8_t i2c0_Receive(uint8_t *rdata)
 {
     uint8_t reallen;
     uint8_t i;
-    uint8_t temp[10];
+//    uint8_t temp[10];
     reallen = CIRC_RM_CNT(g_i2c0_rxbuf);
     if (reallen < 5)
     {
@@ -469,21 +467,38 @@ uint8_t i2c0_Receive(uint8_t *rdata)
     }
     for (i = 0; i < reallen; i++)
     {
-        CIRC_GET_CH(g_i2c0_rxbuf, temp[0]);
-        if (temp[0] != 0)
-            break;
+        CIRC_GET_CH(g_i2c0_rxbuf, rdata[0]);
+        if (rdata[0] == 0x55)
+		{
+read_again:			
+            CIRC_GET_CH(g_i2c0_rxbuf, rdata[1]);
+			i++;
+			if(rdata[1] == 0xaa)  //帧头验证成功
+			{
+				break;
+			}
+			else if(rdata[1] == 0x55)
+			{
+				goto read_again;
+			}
+		}
     }
-    for (i = 1; i < 5; i++)
+	
+	while( CIRC_RM_CNT(g_i2c0_rxbuf) < 3) //还需要3个数据
+		vTaskDelay(3); //等待一下数据
+	
+	
+    for (i = 2; i < 5; i++)
     {
-        CIRC_GET_CH(g_i2c0_rxbuf, temp[i]);
+        CIRC_GET_CH(g_i2c0_rxbuf, rdata[i]);
     }
-    memcpy(rdata, temp, 5);
-    memset(temp, 0, sizeof(temp));
-    if ((rdata[0] != 0x55) || (rdata[1] != 0xaa) || (CheckSum(&rdata[0], 5) != rdata[4]))
+//    memcpy(rdata, temp, 5);
+//    memset(temp, 0, sizeof(temp));
+    if ((CheckSum(rdata, 5) != rdata[4]))
     {
         printf("i2c recv data error\r\n");
 		printf("data[0] = %#x,[1]= %#x,[2]= %#x,[3]= %#x,[4]= %#x\r\n",rdata[0],rdata[1],rdata[2],rdata[3],rdata[4]);
-        CIRC_RELEASE(g_i2c0_rxbuf);
+		//    CIRC_RELEASE(g_i2c0_rxbuf);
         return 0;
     }
     return (reallen);
@@ -623,7 +638,7 @@ static uint8_t cmd_led_control(uint8_t cmd, LED_control_t led_stat)
         {
 		//	printf("at9236_reg_a xxxxx\r\n");
             AT9236_LED_control(at9236_reg_a, led_stat);
-            AT9236_transmit_byte(0x25, 0x00);  // update register
+        //    AT9236_transmit_byte(0x25, 0x00);  // update register
         }
         else
         {
@@ -911,7 +926,6 @@ void key_light_control_task(void *pdata)
     
 	set_keyleds_pwm(4);   //设置开机后的默认亮度是4%
     AT9236_LED_lightAll();  //点亮全部的灯
-
 
 	
 	for(;;)
