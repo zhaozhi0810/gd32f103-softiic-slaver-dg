@@ -6,9 +6,9 @@
 * 当前版本：1.0，蒋润东、20220628
 * 历史版本：无
 */
-#include "iic.h"
-#include "soft_iic_master_app.h"
-#include "software_iic_slave.h"
+#include "includes.h"
+//#include "soft_iic_master_app.h"
+//#include "software_iic_slave.h"
 
 
 #define I2C0_SLAVE_ADDRESS7     0x80
@@ -286,14 +286,115 @@ void IIC1_IRQ_config(void)
 }
 
 /*iic初始化*/
-void IIC_init(void)
+void IIC0_init(void)
 {	
-//    IIC0_gpio_config();
-//    IIC0_config();
-//    IIC0_IRQ_config();
+    IIC0_gpio_config();
+    IIC0_config();
+    IIC0_IRQ_config();
 //	InitSwSlaveI2C0();
-//    IIC1_gpio_config();
-//    IIC1_config();
+}
+
+
+/*iic初始化*/
+void IIC1_init(void)
+{	
+
+    IIC1_gpio_config();
+    IIC1_config();
+	
+	CH453_AT9236_map_init();
+    AT9236_transmit_byte(0x4f, 0x00);  // reset
+    AT9236_transmit_byte(0x00, 0x01);  // set shutdown register(0x00: software shutdown mode; 0x01: normal operation)
+    AT9236_transmit_byte(0x4A, 0x00);  // set all channels enable
+    AT9236_transmit_byte(0x4B, 0x01);  // Output Frequency Setting 22KHz(0x00:3KHz; 0x01:22KHz)
+    
+	set_keyleds_pwm(4);   //设置开机后的默认亮度是4%
+    AT9236_LED_lightAll();  //点亮全部的灯
+	
 //	IicApp_Init(IIC2_INDEX);
 }
+
+
+
+#if 1
+/*i2c0数据接收函数*/
+uint8_t i2c0_get_txdata(uint8_t *rdata)
+{
+    uint8_t reallen;
+    uint8_t i;
+//    uint8_t temp[10];
+    reallen = CIRC_RM_CNT(g_i2c0_txbuf);
+
+    if (reallen < 4)   //发送有7个字节，去掉帧头2个字节0x55，0xaa，和末尾的校验和，只剩下4个字节的数据。
+    {
+        return 0;
+    }
+	
+    for (i = 0; i < 4; i++)//只读4个字节
+    {
+        CIRC_GET_CH(g_i2c0_txbuf, rdata[i]);
+    }
+
+    return (4);
+}
+
+
+
+
+/*填充要发送的数据*/
+void iic0_send_data(uint8_t *buf)
+{
+//	g_IIC_tx_buf[0] = 0x55;
+//	g_IIC_tx_buf[1] = 0xaa;
+	g_IIC_tx_buf[2] = buf[0];
+    g_IIC_tx_buf[3] = buf[1];
+    g_IIC_tx_buf[4] = buf[2];
+    g_IIC_tx_buf[5] = buf[3];
+    g_IIC_tx_buf[6] = CheckSum((void*)g_IIC_tx_buf, 7);
+	
+	gpio_bit_reset(GPIOA, GPIO_PIN_2); //high->low
+    gpio_bit_set(GPIOA, GPIO_PIN_2); //low->high
+	
+}
+
+
+/*任务5  把iic缓存的东西发出去
+*/
+void iic0_send_data_task(void *pdata)
+{
+    uint8_t tx_data[8] = {0};
+
+    while (1)
+    {
+		ulTaskNotifyTake(ULONG_MAX,  //退出时，清除对应的位，0表示都不清零
+						portMAX_DELAY); //无限等待
+//		vTaskDelay(10);
+		//等待事件
+//		xEventGroupWaitBits(g_xeventGh ,  
+//						  0x2,     //bit1
+//						 pdTRUE ,   //退出时清除该位？
+//						 pdFALSE,	 //或，只等1个位	
+//						 portMAX_DELAY);
+		
+		//printf("------iic0_send_data_task \r\n");
+        while (i2c0_get_txdata(tx_data) > 0)
+        {
+			//printf("iic0_send_data_task txv2 = %#x,txv3 = %#x,txv4 = %#x,txv5 = %#x\r\n",tx_data[0],tx_data[1],tx_data[2],tx_data[3]);
+			for(;;)
+			{
+			//	printf("iic0_2023-03-16 \r\n");
+				if(g_iic0_is_Idle)  //确认是空闲状态
+				{
+					iic0_send_data(tx_data);   //发送数据
+					break;
+				}
+				else
+					vTaskDelay(10);
+			}
+				
+        }
+    }
+}
+
+#endif
 

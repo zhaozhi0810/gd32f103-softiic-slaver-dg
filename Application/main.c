@@ -9,7 +9,7 @@
 
 #include "includes.h"
 
-#define SOFT_VERSION    0x03   /* 软件版本 2023-03-02 版本升级到03 */
+
 #define KB_NO_NEW_KEY    0xff    /* 无按键按下时的值 */
 #define KB_DEBOUNCE_THRES      20  /* 消抖阈值 */
 
@@ -19,8 +19,8 @@ const char* g_build_time_str = "Buildtime :"__DATE__" "__TIME__;   //获得编�
 //OS_CPU_SR cpu_sr = 0;/*UCOSII定义，不加g_*/
 TaskHandle_t  TaskHandle_ToCpu_IIC;   //存放IIC任务指针
 TaskHandle_t  TaskHandle_Light_Control;
-
-
+TaskHandle_t  TaskHandle_IIC0_SendData;  //iic0发送数据
+SemaphoreHandle_t write_iic0_txbuf_bin;  //写缓存互斥量
 
 uint8_t g_key_scan_set_num = 0;/*扫描按键数*/
 uint8_t g_card_device_type = 0xff;/*按键类型*/
@@ -562,21 +562,6 @@ static void reset_handle(void)
 //    return 0;
 //}
 
-/*寻找寄存器的值*/
-static uint8_t find_AT9236_reg(uint8_t rpt_keyValue)
-{
-    int i;
-    for (i = 0; i < g_key_scan_set_num; i++)
-    {
-        if (g_GPIO_KEY_map_value[i] == rpt_keyValue)
-        {
-		//	printf("i = %d g_GPIO_KEY_map_value[i] = %#x g_GPIO_LED_map_value[i] = %#x\r\n",i,rpt_keyValue,g_GPIO_LED_map_value[i]);
-            return g_GPIO_LED_map_value[i];
-        }
-    }
-//	printf("find_AT9236_reg none \r\n");
-    return 0;
-}
 
 
 
@@ -590,9 +575,9 @@ void fill_tx_data(uint8_t txv2, uint8_t txv3, uint8_t txv4, uint8_t txv5)
     g_IIC_tx_buf[5] = txv5;
     g_IIC_tx_buf[6] = CheckSum(g_IIC_tx_buf, 7);
 	
-	printf("fill_tx_data:%#x,%#x,%#x,%#x,%#x,%#x,%#x\r\n",g_IIC_tx_buf[0],g_IIC_tx_buf[1],g_IIC_tx_buf[2]
-								,g_IIC_tx_buf[3],g_IIC_tx_buf[4],g_IIC_tx_buf[5],g_IIC_tx_buf[6]);
-	
+//	printf("fill_tx_data:%#x,%#x,%#x,%#x,%#x,%#x,%#x\r\n",g_IIC_tx_buf[0],g_IIC_tx_buf[1],g_IIC_tx_buf[2]
+//								,g_IIC_tx_buf[3],g_IIC_tx_buf[4],g_IIC_tx_buf[5],g_IIC_tx_buf[6]);
+//	
     gpio_bit_reset(GPIOA, GPIO_PIN_2); //high->low
     gpio_bit_set(GPIOA, GPIO_PIN_2); //low->high
 }
@@ -602,22 +587,19 @@ void fill_tx_data(uint8_t txv2, uint8_t txv3, uint8_t txv4, uint8_t txv5)
 
 void fill_tx_data(uint8_t txv2, uint8_t txv3, uint8_t txv4, uint8_t txv5)
 {
-	SwSlaveI2C.TxBuf[0] = 0x55;
-	SwSlaveI2C.TxBuf[1] = 0xaa;
-	SwSlaveI2C.TxBuf[2] = txv2;
-    SwSlaveI2C.TxBuf[3] = txv3;
-    SwSlaveI2C.TxBuf[4] = txv4;
-    SwSlaveI2C.TxBuf[5] = txv5;
-    SwSlaveI2C.TxBuf[6] = CheckSum((void*)SwSlaveI2C.TxBuf, 7);
-	
-	gpio_bit_reset(GPIOA, GPIO_PIN_2); //high->low
-    gpio_bit_set(GPIOA, GPIO_PIN_2); //low->high
-	
+//	if(write_iic0_txbuf_bin) xSemaphoreTake(write_iic0_txbuf_bin, portMAX_DELAY);  //获取信号量
+//	else printf("write_iic0_txbuf_bin is NULL \r\n");
+	CIRC_PUT_CH(g_i2c0_txbuf, txv2);
+	CIRC_PUT_CH(g_i2c0_txbuf, txv3);
+	CIRC_PUT_CH(g_i2c0_txbuf, txv4);
+	CIRC_PUT_CH(g_i2c0_txbuf, txv5);
+//	xSemaphoreGive( write_iic0_txbuf_bin);    //释放信号量
+	xTaskNotifyGive(TaskHandle_IIC0_SendData);  //唤醒发送数据任务
+	//vTaskNotifyGiveFromISR(TaskHandle_IIC0_SendData,NULL);  //唤醒发送数据任务
 	
 //	printf("[6] = %#x\r\n",SwSlaveI2C.TxBuf[6]);   //必须要打印才行？2023-03-09
-//	printf("[0] = %#x,[1] = %#x,[2] = %#x,[3] = %#x,[4] = %#x,[5] = %#x,[6] = %#x\r\n",
-//		SwSlaveI2C.TxBuf[0],SwSlaveI2C.TxBuf[1],SwSlaveI2C.TxBuf[2],SwSlaveI2C.TxBuf[3],
-//		SwSlaveI2C.TxBuf[4],SwSlaveI2C.TxBuf[5],SwSlaveI2C.TxBuf[6]);
+//	printf("txv2 = %#x,txv3 = %#x,txv4 = %#x,txv5 = %#x\r\n",
+//		txv2,txv3,txv4,txv5);
 	
 }
 
@@ -626,57 +608,7 @@ void fill_tx_data(uint8_t txv2, uint8_t txv3, uint8_t txv4, uint8_t txv5)
 
 
 
-/*led控制指令解析函数*/
-static uint8_t cmd_led_control(uint8_t cmd, LED_control_t led_stat)
-{
-    uint8_t txv5 = 0x5A;
-    if ((cmd > 0x00) && (cmd < 0x28))   //0-39
-    {
-        uint8_t at9236_reg_a = find_AT9236_reg(cmd);
-		//printf("at9236_reg_a = %#x +++\r\n",at9236_reg_a);
-        if (at9236_reg_a >= 0x26 && at9236_reg_a <= g_LED_set_max_num)
-        {
-		//	printf("at9236_reg_a xxxxx\r\n");
-            AT9236_LED_control(at9236_reg_a, led_stat);
-        //    AT9236_transmit_byte(0x25, 0x00);  // update register
-        }
-        else
-        {
-            txv5 = 0xA5;
-            return txv5;
-        }
-    }
-    else if ((cmd >= 0x28) && (cmd <= 0x2A))
-    {
-        if (led_stat == LED_OFF)
-        {
-			RGB_control_off((RGB_color_t)cmd);
-            //RGB_control(RGB_ALL_OFF);
-        }
-        else
-            RGB_control((RGB_color_t)cmd);
-    }
-    else if (cmd == 0x2B) /*lsr add 20220505*/
-    {
-        if (led_stat == LED_OFF)
-        {
-            AT9236_LED_lightAll_OFF();
-			//	RGB_control(RGB_ALL_OFF);   //RGB_全部熄灭，2023-02-33,2023-03-02 注释，客户说不需要了
-        }
-        else
-        {
-            AT9236_LED_lightAll();
-		//	RGB_control(RGB_ALL);   //RGB_全部点亮，2023-02-33,2023-03-02 注释，客户说不需要了
-        }
-       // AT9236_transmit_byte(0x25, 0x00);  // update register
-    }
-    else
-    {
-        txv5 = 0xA5;
-        return txv5;
-    }
-    return txv5;
-}
+
 
 
 //按键引脚初始化
@@ -820,22 +752,23 @@ void task3_func(void *pdata)
 {
     uint8_t rx_data[7] = {0};
     uint8_t cmd_type, cmd;
+	uint8_t flash_time;
 	uint32_t task_notity_val;
     printf("task3 comunicate cpu iic start\r\n");
 	
-	InitSwSlaveI2C0();
-//	set_board_map_value();
+	/*iic初始化*/
+	IIC0_init()	;
+
     while (1)
     {
 		ulTaskNotifyTake(ULONG_MAX,  //退出时，清除对应的位，0表示都不清零
 						portMAX_DELAY); //无限等待
-//		vTaskDelay(10);
         if (i2c0_Receive(rx_data) > 0)
         {
             cmd_type = rx_data[2];
             cmd = rx_data[3];
 			
-//			printf("cmd_type = %d,cmd = %d\r\n",cmd_type,cmd);
+		//	printf("cmd_type = %d,cmd = %d\r\n",cmd_type,cmd);
 			
             switch (cmd_type)
             {
@@ -869,6 +802,7 @@ void task3_func(void *pdata)
                 fill_tx_data(0x50, 0x00, 0x00, 0x5A);
                 break;
             case CMD_LIGHT_LED:
+				printf("cmd_type = %d,cmd = %d\r\n",cmd_type,cmd);
 				task_notity_val = CMD_LIGHT_LED | (cmd<<8);
 				xTaskNotify(TaskHandle_Light_Control,task_notity_val,eSetValueWithOverwrite);
 			
@@ -883,6 +817,14 @@ void task3_func(void *pdata)
                 fill_tx_data(0x70, 0x00, 0x00, 0x5a);
                 break;
             default:
+				if((cmd_type & 0xfc) == CMD_LIGHT_FLASH)  //处理0x80,0x81,0x82,0x83
+				{
+					printf("cmd_type = %d,cmd = %d\r\n",cmd_type,cmd);
+					flash_time = cmd_type &0x3;   //闪烁频率
+					light_leds_add_flash(cmd, flash_time);
+					
+					fill_tx_data(cmd_type, 0x00, 0x00, 0x5a);
+				}
                 break;
             }
         }
@@ -916,7 +858,9 @@ void key_light_control_task(void *pdata)
 	uint32_t value;
 	uint8_t cmd,data;
 	
-	IicApp_Init(IIC2_INDEX);   //通道iic初始化
+	/*iic初始化*/
+	IIC1_init();
+//	IicApp_Init(IIC2_INDEX);   //通道iic初始化
 	
 	CH453_AT9236_map_init();
     AT9236_transmit_byte(0x4f, 0x00);  // reset
@@ -927,6 +871,7 @@ void key_light_control_task(void *pdata)
 	set_keyleds_pwm(4);   //设置开机后的默认亮度是4%
     AT9236_LED_lightAll();  //点亮全部的灯
 
+	printf("key_light_control_task\r\n");
 	
 	for(;;)
 	{
@@ -944,60 +889,25 @@ void key_light_control_task(void *pdata)
 		{
 			case CMD_WRITE_LIGHT:
 			{
-				vTaskDelay(5);
+			//	vTaskDelay(5);
 				set_keyleds_pwm(data);
 			}
 			break;
 			case CMD_LIGHT_LED:
-				vTaskDelay(6);
-                cmd_led_control(data, LED_ON);		
+			//	vTaskDelay(6);
+            //    cmd_led_control(data, LED_ON);
+				key_light_leds_control2(data, LED_ON);	//	data  --> 1-43	
                 break;
             case CMD_LIGHT_OUT:
-				vTaskDelay(6);
-				cmd_led_control(data, LED_OFF);
+			//	vTaskDelay(6);
+				key_light_leds_control2(data, LED_OFF);	
+			//	cmd_led_control(data, LED_OFF);
                 break;
 		}
 	}
 	
 }
 
-
-
-
-#if 0
-//键灯控制任务，调试串口控制使用,调试串口创建，并调用一次
-void key_light_control_debug_task(void *pdata)
-{
-	uint8_t i;
-	set_board_map_value();
-	for(;;)
-	{
-//		ulTaskNotifyTake(ULONG_MAX,  //退出时，清除对应的位，0表示都不清零
-//						portMAX_DELAY); //无限等待
-		
-		//调整到最大亮度
-		AT9236_PWM_control(250);
-		printf("set key_leds pwm to 100%%\r\n");
-
-		for(i=1;i<44;i++)
-		{
-			cmd_led_control(i, LED_ON);
-			printf("cmd_led_control LED_ON %d\r\n",i);
-			vTaskDelay(500);
-		}
-		for(i=1;i<44;i++)
-		{
-			cmd_led_control(i, LED_OFF);
-			printf("cmd_led_control LED_OFF %d\r\n",i);
-			vTaskDelay(500);
-		}
-	}
-	
-	printf("end of debug leds task\r\n");
-	vTaskDelete(NULL);
-	
-}
-#endif
 
 
 
@@ -1054,7 +964,7 @@ void bsp_sys_init(void)
 	//iic的初始化，调整到各自任务中去！！！
     //IIC_init();
     CIRC_RELEASE(g_i2c0_rxbuf);
-//    CIRC_RELEASE(g_i2c0_txbuf);
+    CIRC_RELEASE(g_i2c0_txbuf);
     
 
 	
@@ -1065,7 +975,10 @@ void bsp_sys_init(void)
     //初始化键灯映射值
 	set_board_map_value();
 	
-    printf("sys init finish \r\n");
+	//键灯闪烁控制
+	key_light_leds_flash_init();
+	
+    printf("sys init finish 2023-04-06\r\n");
 }
 
 
@@ -1077,7 +990,7 @@ static void iwdog_init(void)
 	fwdgt_write_enable();
 	fwdgt_config(0xfff,FWDGT_PSC_DIV8);    //设置分配系数,最长819ms
 	
-	fwdgt_enable(); //使能看门狗
+//	fwdgt_enable(); //使能看门狗
 }
 
 //喂狗
@@ -1122,22 +1035,33 @@ void feed_wtg_task(void* data)
 */
 int main(void)
 {
+//	StaticSemaphore_t  pxMutexBuffer;  
     bsp_sys_init();
 	
 	printf("freertos , init ok!!\r\n");	
 	printf("%s\r\n",g_build_time_str);
 	printf("Author:JC&DaZhi <vx:285408136>\r\n"); 
 	
+	//write_iic0_txbuf_mutex = xSemaphoreCreateMutex() ;  //创建互斥量
+	write_iic0_txbuf_bin = xSemaphoreCreateBinary();
+	xSemaphoreGive(write_iic0_txbuf_bin);
+	//xSemaphoreGive( write_iic0_txbuf_mutex);    //释放信号量
+	
+	//3.led指示灯的任务
 	xTaskCreate(task4_func,"TaskLed1",configMINIMAL_STACK_SIZE/2,NULL,1,NULL);
-	//4. 优先级要高一点，不然容易引起cpu端超时错误
+	//4.cpu通信IIC0任务 优先级要高一点，不然容易引起cpu端超时错误
 	xTaskCreate(task3_func,"ToCpu",configMINIMAL_STACK_SIZE*3,NULL,4,&TaskHandle_ToCpu_IIC);  //cpu通信串口任务，优先级高一点  &TaskHandle_ToCpu_Com
 	//5. 矩阵键盘扫描任务
 	xTaskCreate(task2_func,"key_bod",configMINIMAL_STACK_SIZE*2,NULL,3,NULL);//&TaskHandle_key_Matrix);  //矩阵键盘扫描任务
 	
-	
+	//6.控制键灯的任务
 	xTaskCreate(key_light_control_task,"lights",configMINIMAL_STACK_SIZE*2,NULL,2,&TaskHandle_Light_Control);
 	
-	//feed_wtg(void* data)
+	//7.发送iic0缓存的数据
+	xTaskCreate(iic0_send_data_task,"iic0_send",configMINIMAL_STACK_SIZE*2,NULL,4,&TaskHandle_IIC0_SendData);
+	
+	
+	//8.单片机内部看门狗
 	xTaskCreate(feed_wtg_task,"wtg",configMINIMAL_STACK_SIZE,NULL,2,NULL);
 	
 	

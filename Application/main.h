@@ -36,6 +36,7 @@
 #define CMD_RESET           0x50
 #define CMD_LIGHT_LED       0x60
 #define CMD_LIGHT_OUT       0x70
+#define CMD_LIGHT_FLASH     0x80
 
 typedef struct _IIC_circ_buf
 {
@@ -63,17 +64,26 @@ typedef struct
 
 
 extern TaskHandle_t  TaskHandle_ToCpu_IIC;   //存放IIC任务指针
-
+extern TaskHandle_t  TaskHandle_IIC0_SendData;  //iic0发送数据
 
 extern IIC_CircleBuffer g_i2c0_rxbuf;
+extern IIC_CircleBuffer g_i2c0_txbuf;
+extern uint8_t g_IIC_tx_buf[7];
+//iic0是否空闲
+extern volatile uint8_t g_iic0_is_Idle;  //0表示非空闲，1表示空闲
+
+
 
 //键灯控制任务，调试串口控制使用
-void key_light_control_debug_task(void *pdata);
+extern void key_light_control_debug_task(void *pdata);
 
 /*填充要发送的数据*/
 extern void fill_tx_data(uint8_t txv2, uint8_t txv3, uint8_t txv4, uint8_t txv5);
 
-uint8_t CheckSum(const uint8_t *buf, uint8_t len);
+extern uint8_t CheckSum(const uint8_t *buf, uint8_t len);
+
+/*按键值对应寄存器*/
+extern void CH453_AT9236_map_init(void);
 
 
 #endif

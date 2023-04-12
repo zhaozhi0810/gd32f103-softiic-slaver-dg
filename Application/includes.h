@@ -26,6 +26,9 @@
 
 #define HWTD_USE_INT   //硬件看门狗使用外部中断，下降沿电平触发
 #define LEDS_FLASH_TASK  //led键灯的闪烁由单片机控制,改为定时器控制
+#define SOFT_VERSION    0x04   /* 软件版本 2023-04-06 版本升级到06 */
+
+#define LEDS_FLASH_TASK  //键灯闪烁控制
 
 extern const char* g_build_time_str;
 
@@ -49,7 +52,7 @@ extern const char* g_build_time_str;
 
 #include "uart_debug_handle.h"
 //#include "keys_scan.h"
-
+#include "key_lights_flash.h"
 
 //获得软件版本2023-01-15
 extern uint8_t GetMcuVersion(void);

@@ -102,13 +102,14 @@
 #define configUSE_16_BIT_TICKS			0	//系统节拍计数器的变量类型 1:16,0:32 无符号
 #define configIDLE_SHOULD_YIELD			1   //空闲任务放弃cpu使用权给其他同优先级的用户任务
 #define configUSE_MUTEXES				1   //使用互斥信号量
-#define configQUEUE_REGISTRY_SIZE		8	//设置可以注册的信号量和消息队列个数
+#define configQUEUE_REGISTRY_SIZE		10	//设置可以注册的信号量和消息队列个数
 #define configCHECK_FOR_STACK_OVERFLOW	0	//原先设置为2
 #define configUSE_RECURSIVE_MUTEXES		0	//使用递归互斥信号量
 #define configUSE_MALLOC_FAILED_HOOK	0	//原先设置为1
 #define configUSE_APPLICATION_TASK_TAG	0	//应用程序任务标签
 #define configUSE_COUNTING_SEMAPHORES	1	
 #define configGENERATE_RUN_TIME_STATS	0	//1启用运行时间统计        0不启用
+//#define configSUPPORT_DYNAMIC_ALLOCATION 1
 //#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()   ConfigureTimerForRunTimeStates()
 //#define portGET_RUN_TIME_COUNTER_VALUE()           FreeRTOSRunTimeTicks
 

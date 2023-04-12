@@ -157,8 +157,8 @@ void IIC0_INT_gpio(void)
     /* enable the clock */
     rcu_periph_clock_enable(RCU_GPIOA);
     /* configure GPIO port */
-    gpio_init(GPIOA, GPIO_MODE_OUT_PP, GPIO_OSPEED_2MHZ, GPIO_PIN_2);
-    gpio_bit_set(GPIOA, GPIO_PIN_2); //high
+	gpio_bit_set(GPIOA, GPIO_PIN_2); //high
+    gpio_init(GPIOA, GPIO_MODE_OUT_PP, GPIO_OSPEED_2MHZ, GPIO_PIN_2);    
 }
 
 /*系统IO初始化*/

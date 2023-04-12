@@ -70,6 +70,7 @@ static void Com_Debug_Message_Handle1(uint8_t buf)
 			printf("*FreeRTOS* ");
 			printf("%s\r\n",(char*)g_build_time_str);  //打印编译的时间
 			printf("Author:JC&DaZhi <vx:285408136>\r\n"); 
+			printf("Version : %02d\r\n",SOFT_VERSION); 
 		break;
 		case '1':
 			printf("AT9236_LED_lightAll\r\n");  //lcd加电状态

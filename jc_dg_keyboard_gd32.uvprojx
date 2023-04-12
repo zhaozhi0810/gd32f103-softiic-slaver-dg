@@ -312,8 +312,8 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>3</Optim>
-            <oTime>1</oTime>
+            <Optim>1</Optim>
+            <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
             <Strict>0</Strict>
@@ -474,24 +474,14 @@
               <FilePath>.\Application\uart_debug_handle.c</FilePath>
             </File>
             <File>
-              <FileName>software_iic_slave.c</FileName>
+              <FileName>AT9236.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\Application\software_iic_slave.c</FilePath>
+              <FilePath>.\Application\AT9236.c</FilePath>
             </File>
             <File>
-              <FileName>AT9236 _soft_iic.c</FileName>
+              <FileName>key_lights_flash.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\Application\AT9236 _soft_iic.c</FilePath>
-            </File>
-            <File>
-              <FileName>soft_iic_master.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Application\soft_iic_master.c</FilePath>
-            </File>
-            <File>
-              <FileName>soft_iic_master_app.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Application\soft_iic_master_app.c</FilePath>
+              <FilePath>.\Application\key_lights_flash.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -601,6 +591,12 @@
           <targetInfo name="Target 1"/>
         </targetInfos>
       </component>
+      <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="TIMER" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU">
+        <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
+        <targetInfos>
+          <targetInfo name="Target 1"/>
+        </targetInfos>
+      </component>
       <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="USART" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU">
         <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
         <targetInfos>
@@ -672,6 +668,14 @@
       <file attr="config" category="source" name="Device\Firmware\Peripherals\src\gd32f10x_rcu.c" version="2.0.1">
         <instance index="0">RTE\Device\GD32F103VB\gd32f10x_rcu.c</instance>
         <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="RCU" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS MISC"/>
+        <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
+        <targetInfos>
+          <targetInfo name="Target 1"/>
+        </targetInfos>
+      </file>
+      <file attr="config" category="source" name="Device\Firmware\Peripherals\src\gd32f10x_timer.c" version="2.0.1">
+        <instance index="0">RTE\Device\GD32F103VB\gd32f10x_timer.c</instance>
+        <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="TIMER" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU"/>
         <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
         <targetInfos>
           <targetInfo name="Target 1"/>

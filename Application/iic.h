@@ -28,7 +28,18 @@
 #define     CH453_I2C_ADDR      0x40
 #define     CH453_I2C_MASK      0x3E
 
-void IIC_init(void);/*iic初始化*/
+//void IIC_init(void);/*iic初始化*/
 void CH453_Write(uint16_t cmd); /*写命令*/
+
+
+/*iic初始化*/
+void IIC0_init(void);
+/*iic初始化*/
+void IIC1_init(void);
+
+
+/*任务5  把iic缓存的东西发出去
+*/
+void iic0_send_data_task(void *pdata);
 
 #endif
