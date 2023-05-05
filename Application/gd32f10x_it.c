@@ -49,7 +49,7 @@ extern uint8_t i2c0_send_mark;
 
 //iic0是否空闲
 volatile uint8_t g_iic0_is_Idle = 1;  //0表示非空闲，1表示空闲
-
+volatile uint8_t g_iic0_has_senddatas = 0;  //0表示没有，1表示有数据
 
 
 uint8_t num_test;
@@ -182,32 +182,42 @@ void I2C0_EV_IRQHandler(void)
 		g_iic0_is_Idle = 0;  //0表示非空闲，1表示空闲
         i2c_interrupt_flag_clear(I2C0, I2C_INT_FLAG_ADDSEND);
         i = 0;
-        i2c_data_transmit(I2C0, g_IIC_tx_buf[i++]);
+//        i2c_data_transmit(I2C0, g_IIC_tx_buf[i++]);
     }
     else if (i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_RBNE))
     {
+		g_iic0_is_Idle = 0;  //0表示非空闲，1表示空闲
         /* if reception data register is not empty ,I2C0 will read a data from I2C_DATA */
         CIRC_PUT_CH(g_i2c0_rxbuf, i2c_data_receive(I2C0));
     }
-    else if ((i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_TBE)) && (!i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_AERR)))
+    else if ((i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_TBE)))  // && !i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_AERR) 
     {
         /*收到主机读取信号，并且没有错误，则发送数据*/
         /* send a data byte */
-        if (i < 7)
-        {
-            i2c_data_transmit(I2C0, g_IIC_tx_buf[i]);
-            i++;
-            if (i == 7)
-            {
-                g_IIC_tx_buf[2] = 0;
-                g_IIC_tx_buf[3] = 0;
-                g_IIC_tx_buf[4] = 0;
-                g_IIC_tx_buf[5] = 0;
-                g_IIC_tx_buf[6] = 0;
-				g_iic0_is_Idle = 1;  //0表示非空闲，1表示空闲
-				vTaskNotifyGiveFromISR(TaskHandle_IIC0_SendData,NULL);  //唤醒发送数据任务
-            }
-        }
+		i2c_interrupt_flag_clear(I2C0, I2C_INT_FLAG_TBE);
+		if(i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_AERR))
+		{
+			i2c_interrupt_flag_clear(I2C0, I2C_INT_FLAG_AERR);
+		}
+		else
+		{
+			if (i < 7) //继续发送
+			{
+				i2c_data_transmit(I2C0, g_IIC_tx_buf[i++]);
+				//i++;
+				if (i == 7)
+				{
+					g_IIC_tx_buf[2] = 0;
+					g_IIC_tx_buf[3] = 0;
+					g_IIC_tx_buf[4] = 0;
+					g_IIC_tx_buf[5] = 0;
+					g_IIC_tx_buf[6] = 0;
+					g_iic0_is_Idle = 1;  //0表示非空闲，1表示空闲
+					vTaskNotifyGiveFromISR(TaskHandle_IIC0_SendData,NULL);  //唤醒发送数据任务
+					i = 0;
+				}
+			}
+		}
     }
     else if (i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_STPDET))
     {
@@ -222,16 +232,17 @@ void I2C0_EV_IRQHandler(void)
 		vTaskNotifyGiveFromISR(TaskHandle_ToCpu_IIC,NULL);  //唤醒任务
 		g_iic0_is_Idle = 1;  //0表示非空闲，1表示空闲
 		vTaskNotifyGiveFromISR(TaskHandle_IIC0_SendData,NULL);  //唤醒发送数据任务
+		i = 0;
     }
     else if (i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_BTC))
     {
         /*收到字节传输结束标志位*/
         i2c_interrupt_flag_clear(I2C0, I2C_INT_FLAG_BTC);
     }
-    else if (i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_TBE))
-    {
-        i2c_interrupt_flag_clear(I2C0, I2C_INT_FLAG_TBE);
-    }
+//    else if (i2c_interrupt_flag_get(I2C0, I2C_INT_FLAG_TBE))
+//    {
+//        i2c_interrupt_flag_clear(I2C0, I2C_INT_FLAG_TBE);
+//    }
     i2c_interrupt_enable(I2C0, I2C_INT_ERR);
     i2c_interrupt_enable(I2C0, I2C_INT_EV);
     i2c_interrupt_enable(I2C0, I2C_INT_BUF);

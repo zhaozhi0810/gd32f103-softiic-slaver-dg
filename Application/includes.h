@@ -58,5 +58,8 @@ extern const char* g_build_time_str;
 extern uint8_t GetMcuVersion(void);
 
 extern uint8_t more_debug_info;   //打印更多的调试信息，0则不打印，调试串口控制
+
+//extern SemaphoreHandle_t iic0_has_senddatas;  //iic0发送数据准备好了
+extern volatile uint8_t g_iic0_has_senddatas;  //0表示没有，1表示有数据
 #endif
 

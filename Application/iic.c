@@ -385,7 +385,10 @@ void iic0_send_data_task(void *pdata)
 			//	printf("iic0_2023-03-16 \r\n");
 				if(g_iic0_is_Idle)  //确认是空闲状态
 				{
+					g_iic0_is_Idle = 0;
 					iic0_send_data(tx_data);   //发送数据
+				//	g_iic0_has_senddatas = 1;  //数据准备好了
+				//	xSemaphoreGive(iic0_has_senddatas);
 					break;
 				}
 				else

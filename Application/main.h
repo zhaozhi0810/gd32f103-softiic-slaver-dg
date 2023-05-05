@@ -36,7 +36,9 @@
 #define CMD_RESET           0x50
 #define CMD_LIGHT_LED       0x60
 #define CMD_LIGHT_OUT       0x70
-#define CMD_LIGHT_FLASH     0x80
+#define CMD_LIGHT_FLASH     0x80   //注意与jc_keyboard对应
+#define CMD_UPDATE_MCU      0x90   //单片机通过3399的iic升级，2023-05-05
+
 
 typedef struct _IIC_circ_buf
 {

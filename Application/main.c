@@ -20,7 +20,10 @@ const char* g_build_time_str = "Buildtime :"__DATE__" "__TIME__;   //获得编�
 TaskHandle_t  TaskHandle_ToCpu_IIC;   //存放IIC任务指针
 TaskHandle_t  TaskHandle_Light_Control;
 TaskHandle_t  TaskHandle_IIC0_SendData;  //iic0发送数据
-SemaphoreHandle_t write_iic0_txbuf_bin;  //写缓存互斥量
+//SemaphoreHandle_t write_iic0_txbuf_bin;  //写缓存互斥量
+//SemaphoreHandle_t iic0_has_senddatas;  //iic0发送数据准备好了
+
+
 
 uint8_t g_key_scan_set_num = 0;/*扫描按键数*/
 uint8_t g_card_device_type = 0xff;/*按键类型*/
@@ -816,6 +819,18 @@ void task3_func(void *pdata)
               //  g_IIC_tx_data[5] = 0x5a;//cmd_led_control(cmd, LED_OFF);
                 fill_tx_data(0x70, 0x00, 0x00, 0x5a);
                 break;
+			case CMD_UPDATE_MCU:   //单片机升级
+				if(cmd == 0)  //上报md5，共32个字节
+				{
+				
+				}
+				else if(cmd == 1) //准备升级，直接设置后重启
+				{
+				
+				}
+			
+			
+				break;
             default:
 				if((cmd_type & 0xfc) == CMD_LIGHT_FLASH)  //处理0x80,0x81,0x82,0x83
 				{
@@ -1043,8 +1058,8 @@ int main(void)
 	printf("Author:JC&DaZhi <vx:285408136>\r\n"); 
 	
 	//write_iic0_txbuf_mutex = xSemaphoreCreateMutex() ;  //创建互斥量
-	write_iic0_txbuf_bin = xSemaphoreCreateBinary();
-	xSemaphoreGive(write_iic0_txbuf_bin);
+//	iic0_has_senddatas = xSemaphoreCreateBinary();
+	
 	//xSemaphoreGive( write_iic0_txbuf_mutex);    //释放信号量
 	
 	//3.led指示灯的任务

@@ -167,7 +167,10 @@ void AT9236_LED_control(uint8_t write_address, LED_control_t cmd)
     i2c_data_transmit(I2C_AT9236, write_address);  
     /* wait until BTC bit is set */
     while (!i2c_flag_get(I2C_AT9236, I2C_FLAG_TBE));
-    i2c_data_transmit(I2C_AT9236, cmd);
+    
+	if(cmd)
+		cmd = 0x3;   //降低电流，2023-04-27
+	i2c_data_transmit(I2C_AT9236, cmd);
     while (!i2c_flag_get(I2C_AT9236, I2C_FLAG_TBE));
     /* send a stop condition to I2C bus */
     i2c_stop_on_bus(I2C_AT9236);
